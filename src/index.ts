@@ -20,15 +20,20 @@ import { apiShare } from "./web/share-api.js";
 
 export { UsageStore };
 
-function unauthorized(): Response {
-  return new Response("Authentication required.", {
-    status: 401,
-    headers: {
-      "www-authenticate": 'Basic realm="CF Free WebDAV", charset="UTF-8"',
-      "content-type": "text/plain; charset=utf-8",
-      "cache-control": "no-store",
-    },
-  });
+function unauthorized(challenge = true): Response {
+  const headers: Record<string, string> = {
+    "content-type": "text/plain; charset=utf-8",
+    "cache-control": "no-store",
+  };
+  if (challenge) headers["www-authenticate"] = 'Basic realm="CF Free WebDAV", charset="UTF-8"';
+  return new Response("Authentication required.", { status: 401, headers });
+}
+
+function unauthorizedJson(): Response {
+  return Response.json(
+    { error: "Authentication required." },
+    { status: 401, headers: { "cache-control": "no-store" } },
+  );
 }
 
 function credentialError(message: string): Response {
@@ -53,6 +58,7 @@ function sessionSecret(env: Env): string {
 async function requireAuthorization(
   request: Request,
   env: Env,
+  challenge = false,
 ): Promise<Response | null> {
   if (!hasCredentials(env)) return credentialError("Set the WEBDAV_PASSWORD secret before using WebDAV.");
   if (await isAuthorized(request, env.WEBDAV_USERNAME || "webdav", env.WEBDAV_PASSWORD || "")) {
@@ -60,7 +66,26 @@ async function requireAuthorization(
   }
   const token = readCookie(request, SESSION_COOKIE);
   if (token && (await verifySession(token, sessionSecret(env)))) return null;
-  return unauthorized();
+  return challenge ? unauthorized() : unauthorizedJson();
+}
+
+/**
+ * 请求通过 Basic Auth 但还没有有效会话 cookie 时，顺带下发一个 30 天会话 cookie，
+ * 让浏览器（含此前用原生弹窗登录的）自动过渡到免登录状态。
+ */
+async function withSessionCookie(response: Response, request: Request, env: Env): Promise<Response> {
+  const token = readCookie(request, SESSION_COOKIE);
+  if (token && (await verifySession(token, sessionSecret(env)))) return response;
+  if (!(await isAuthorized(request, env.WEBDAV_USERNAME || "webdav", env.WEBDAV_PASSWORD || ""))) {
+    return response;
+  }
+  const session = await signSession(Date.now() + SESSION_MAX_AGE_SECONDS * 1000, sessionSecret(env));
+  const headers = new Headers(response.headers);
+  headers.append(
+    "set-cookie",
+    `${SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_MAX_AGE_SECONDS}`,
+  );
+  return new Response(response.body, { status: response.status, headers });
 }
 
 async function handleShareDownload(request: Request, env: Env): Promise<Response> {
@@ -158,7 +183,7 @@ export default {
       const denied = await requireAuthorization(request, env);
       if (denied) return denied;
       if (!env.USAGE_STORE) return new Response("Durable Object binding is not configured.", { status: 503 });
-      return apiFiles(request, env, new DOUsageClient(env.USAGE_STORE));
+      return withSessionCookie(await apiFiles(request, env, new DOUsageClient(env.USAGE_STORE)), request, env);
     }
     if (url.pathname === "/api/share" && request.method === "POST") {
       const denied = await requireAuthorization(request, env);
@@ -213,8 +238,15 @@ export default {
       return credentialError("Set the WEBDAV_PASSWORD secret before using WebDAV.");
     }
 
-    const denied = await requireAuthorization(request, env);
-    if (denied) return denied;
+    const denied = await requireAuthorization(request, env, true);
+    if (denied) {
+      const accept = request.headers.get("accept") || "";
+      const isNavigation = (request.method === "GET" || request.method === "HEAD") && accept.includes("text/html");
+      if (isNavigation) {
+        return Response.redirect(new URL("/", request.url).toString(), 302);
+      }
+      return denied;
+    }
     if (!env.FILES || !env.USAGE_STORE) {
       return new Response("R2 bucket or Durable Object binding is not configured.", { status: 503 });
     }
