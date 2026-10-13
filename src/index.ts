@@ -1,4 +1,12 @@
 import { isAuthorized } from "./auth/basic.js";
+import {
+  SESSION_COOKIE,
+  SESSION_MAX_AGE_SECONDS,
+  SESSION_SHORT_TTL_MS,
+  readCookie,
+  signSession,
+  verifySession,
+} from "./auth/session.js";
 import { parseDavPath } from "./http/path.js";
 import { LimitedR2, type UsageClient } from "./monitor/limited-r2.js";
 import { QuotaExceededError } from "./monitor/quota.js";
@@ -38,15 +46,21 @@ function shareSecret(env: Env): string {
   return env.SHARE_SECRET || env.WEBDAV_PASSWORD || "";
 }
 
+function sessionSecret(env: Env): string {
+  return env.SESSION_SECRET || env.WEBDAV_PASSWORD || "";
+}
+
 async function requireAuthorization(
   request: Request,
   env: Env,
 ): Promise<Response | null> {
   if (!hasCredentials(env)) return credentialError("Set the WEBDAV_PASSWORD secret before using WebDAV.");
-  if (!(await isAuthorized(request, env.WEBDAV_USERNAME || "webdav", env.WEBDAV_PASSWORD || ""))) {
-    return unauthorized();
+  if (await isAuthorized(request, env.WEBDAV_USERNAME || "webdav", env.WEBDAV_PASSWORD || "")) {
+    return null;
   }
-  return null;
+  const token = readCookie(request, SESSION_COOKIE);
+  if (token && (await verifySession(token, sessionSecret(env)))) return null;
+  return unauthorized();
 }
 
 async function handleShareDownload(request: Request, env: Env): Promise<Response> {
@@ -97,9 +111,6 @@ export default {
       if (!hasCredentials(env)) {
         return credentialError("Set the WEBDAV_PASSWORD secret before using WebDAV.");
       }
-      if (!(await isAuthorized(request, env.WEBDAV_USERNAME || "webdav", env.WEBDAV_PASSWORD || ""))) {
-        return unauthorized();
-      }
       const nonceBytes = crypto.getRandomValues(new Uint8Array(18));
       const nonce = btoa(String.fromCharCode(...nonceBytes));
       const headers = new Headers({
@@ -110,6 +121,38 @@ export default {
         "content-security-policy": "default-src 'none'; style-src 'nonce-" + nonce + "'; script-src 'nonce-" + nonce + "'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
       });
       return new Response(webPage(nonce), { headers });
+    }
+    if (url.pathname === "/login" && request.method === "POST") {
+      if (!hasCredentials(env)) return credentialError("Set the WEBDAV_PASSWORD secret before using WebDAV.");
+      if (!(await isAuthorized(request, env.WEBDAV_USERNAME || "webdav", env.WEBDAV_PASSWORD || ""))) {
+        return Response.json({ error: "Invalid credentials." }, { status: 401, headers: { "cache-control": "no-store" } });
+      }
+      let remember = true;
+      try {
+        const body = (await request.json()) as { remember?: unknown };
+        if (typeof body?.remember === "boolean") remember = body.remember;
+      } catch {
+        // 请求体缺失或不是 JSON 时按“记住我”处理
+      }
+      const ttlMs = remember ? SESSION_MAX_AGE_SECONDS * 1000 : SESSION_SHORT_TTL_MS;
+      const token = await signSession(Date.now() + ttlMs, sessionSecret(env));
+      const attributes = [`${SESSION_COOKIE}=${token}`, "Path=/", "HttpOnly", "Secure", "SameSite=Lax"];
+      if (remember) attributes.push(`Max-Age=${SESSION_MAX_AGE_SECONDS}`);
+      return Response.json(
+        { ok: true },
+        { headers: { "set-cookie": attributes.join("; "), "cache-control": "no-store" } },
+      );
+    }
+    if (url.pathname === "/logout" && request.method === "POST") {
+      return Response.json(
+        { ok: true },
+        {
+          headers: {
+            "set-cookie": `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
+            "cache-control": "no-store",
+          },
+        },
+      );
     }
     if (url.pathname === "/api/files" && request.method === "GET") {
       const denied = await requireAuthorization(request, env);
@@ -170,8 +213,8 @@ export default {
       return credentialError("Set the WEBDAV_PASSWORD secret before using WebDAV.");
     }
 
-    const username = env.WEBDAV_USERNAME || "webdav";
-    if (!(await isAuthorized(request, username, env.WEBDAV_PASSWORD || ""))) return unauthorized();
+    const denied = await requireAuthorization(request, env);
+    if (denied) return denied;
     if (!env.FILES || !env.USAGE_STORE) {
       return new Response("R2 bucket or Durable Object binding is not configured.", { status: 503 });
     }

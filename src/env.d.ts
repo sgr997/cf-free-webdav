@@ -10,6 +10,7 @@ interface Env {
   QUOTA_THRESHOLD_PERCENT?: string;
   CF_ACCOUNT_ID?: string;
   CF_API_TOKEN?: string;
+  SESSION_SECRET?: string;
   SHARE_SECRET?: string;
   FEISHU_WEBHOOK_URL?: string;
   FEISHU_WEBHOOK_SECRET?: string;

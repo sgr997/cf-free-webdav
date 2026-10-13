@@ -30,6 +30,19 @@ const style = `
   .conn-code span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .conn-copy { min-height: 30px; padding: 0 10px; font-size: 12px; }
   .conn-note { width: 100%; margin: 0; color: #8794a6; font-size: 11px; line-height: 1.55; }
+  .login-backdrop { position: fixed; inset: 0; z-index: 40; display: none; place-items: center; padding: 20px; background: #eef2f8cc; backdrop-filter: blur(4px); }
+  .login-backdrop.show { display: grid; }
+  .login-card { width: min(360px, 100%); padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: 0 18px 48px #14233b2e; }
+  .login-card h2 { margin: 0 0 6px; font-size: 17px; letter-spacing: -.02em; }
+  .login-sub { margin: 0 0 18px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+  .login-field { display: block; margin-bottom: 12px; }
+  .login-field span { display: block; margin-bottom: 6px; color: #53647d; font-size: 12px; font-weight: 650; }
+  .login-field input { width: 100%; height: 42px; padding: 0 12px; border: 1px solid #dfe6ef; border-radius: 10px; outline: none; background: #fff; color: var(--text); font-size: 13px; }
+  .login-field input:focus { border-color: #8eaff4; box-shadow: 0 0 0 3px #dce8ff; }
+  .login-remember { display: flex; align-items: center; gap: 8px; margin: 4px 0 14px; color: #53647d; font-size: 12px; cursor: pointer; }
+  .login-remember input { width: 15px; height: 15px; accent-color: var(--blue); }
+  .login-error { min-height: 16px; margin: 0 0 10px; color: var(--red); font-size: 12px; }
+  .login-card button { width: 100%; }
   .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 0 2px 12px; }
   .section-heading h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
   .section-heading p { margin: 0; color: var(--muted); font-size: 12px; }
@@ -179,6 +192,7 @@ const script = `
 
   const esc = (value) => { const div = document.createElement('div'); div.textContent = value; return div.innerHTML; };
   const attr = (value) => esc(value).replace(/"/g, '&quot;');
+  const basicHeader = (user, pass) => 'Basic ' + btoa(String.fromCharCode(...new TextEncoder().encode(user + ':' + pass)));
   const apiPath = (segments) => '/api/files?path=' + encodeURIComponent(segments.join('/'));
   const davPath = (segments) => '/dav/' + segments.map(encodeURIComponent).join('/');
 
@@ -236,6 +250,11 @@ const script = `
     box.className = error ? 'show error' : 'show';
     clearTimeout(notify.timer);
     notify.timer = setTimeout(() => { box.className = ''; }, 3200);
+  }
+
+  function showLogin() {
+    el('login-error').textContent = '';
+    el('login').classList.add('show');
   }
 
   function daysUntilReset() {
@@ -398,7 +417,7 @@ const script = `
     status.lastChild.textContent = '正在连接';
     try {
       const response = await fetch(apiPath(currentPath), { cache: 'no-store' });
-      if (response.status === 401) { notify('认证失败，请刷新后重新登录', true); status.className = 'status error'; status.lastChild.textContent = '认证失败'; return; }
+      if (response.status === 401) { showLogin(); status.className = 'status error'; status.lastChild.textContent = '未登录'; return; }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '加载失败');
       currentPath = data.path || [];
@@ -424,6 +443,35 @@ const script = `
   }
 
   el('refresh').addEventListener('click', loadFiles);
+  el('login-form').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const user = el('login-user').value.trim();
+    const pass = el('login-pass').value;
+    el('login-error').textContent = '';
+    el('login-submit').disabled = true;
+    try {
+      const response = await fetch('/login', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', authorization: basicHeader(user, pass) },
+        body: JSON.stringify({ remember: el('login-remember').checked }),
+      });
+      if (!response.ok) {
+        el('login-error').textContent = response.status === 401 ? '用户名或密码不正确' : '登录失败，请稍后重试';
+        return;
+      }
+      el('login-pass').value = '';
+      el('login').classList.remove('show');
+      loadFiles();
+    } catch {
+      el('login-error').textContent = '网络错误，请重试';
+    } finally {
+      el('login-submit').disabled = false;
+    }
+  });
+  el('logout').addEventListener('click', async () => {
+    try { await fetch('/logout', { method: 'POST' }); } catch { /* 退出失败也回到登录页 */ }
+    showLogin();
+  });
   el('search').addEventListener('input', () => renderEntries(currentEntries));
   el('mkdir').addEventListener('click', () => {
     mkdir().then(loadFiles).catch((error) => notify(error.message || '创建失败', true));
@@ -517,7 +565,7 @@ export function webPage(nonce: string): string {
 <main class="app">
   <header class="page-header">
     <div class="brand"><div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.5A2.5 2.5 0 0 1 7.5 5H11l2 2h3.5A2.5 2.5 0 0 1 19 9.5v7a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 16.5z"/><path d="M5 10h14"/><path d="M9 14h6"/></svg></div><div><p class="eyebrow">OBJECT STORAGE · CONTROL CENTER</p><h1>CF Free WebDAV</h1><div class="sub">浏览和管理 R2 文件，随时掌握存储用量</div></div></div>
-    <div class="actions"><button id="refresh"><svg class="btn-icon" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.8-3L4 10"/><path d="M4 5v5h5M4 13a8 8 0 0 0 14.8 3L20 14"/><path d="M20 19v-5h-5"/></svg>刷新列表</button><button id="sync" class="primary"><svg class="btn-icon" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/></svg>同步官方用量</button></div>
+    <div class="actions"><button id="refresh"><svg class="btn-icon" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.8-3L4 10"/><path d="M4 5v5h5M4 13a8 8 0 0 0 14.8 3L20 14"/><path d="M20 19v-5h-5"/></svg>刷新列表</button><button id="sync" class="primary"><svg class="btn-icon" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/></svg>同步官方用量</button><button id="logout"><svg class="btn-icon" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></svg>退出登录</button></div>
   </header>
   <div class="conn-hint">
     <div class="conn-item"><span class="conn-label">WebDAV 地址</span><code class="conn-code"><span id="dav-url"></span></code><button id="copy-dav" class="conn-copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9"/></svg>复制</button></div>
@@ -542,6 +590,17 @@ export function webPage(nonce: string): string {
   <p class="footer-note">用量数据为 Worker 侧统计估算；点击“同步官方用量”可与 Cloudflare 官方数据校准。</p>
 </main>
 <div id="message"></div>
+<div id="login" class="login-backdrop">
+  <form id="login-form" class="login-card">
+    <h2>登录 CF Free WebDAV</h2>
+    <p class="login-sub">输入 WebDAV 账号密码。勾选“记住我”后，30 天内打开页面无需重复登录。</p>
+    <label class="login-field"><span>用户名</span><input id="login-user" type="text" autocomplete="username" value="webdav" required></label>
+    <label class="login-field"><span>密码</span><input id="login-pass" type="password" autocomplete="current-password" required></label>
+    <label class="login-remember"><input id="login-remember" type="checkbox" checked><span>记住我（30 天）</span></label>
+    <p id="login-error" class="login-error"></p>
+    <button id="login-submit" class="primary" type="submit">登录</button>
+  </form>
+</div>
 <div id="share-backdrop" class="dialog-backdrop">
   <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="share-title">
     <h3 id="share-title">生成分享链接</h3>
