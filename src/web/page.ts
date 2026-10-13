@@ -23,6 +23,13 @@ const style = `
   .primary:hover { border-color: var(--blue-dark); background: var(--blue-dark); }
   .btn-icon { width: 16px; height: 16px; }
   .overview { margin-bottom: 22px; }
+  .conn-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 0 2px 22px; padding: 13px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: 0 4px 16px #1e3a5f08; }
+  .conn-item { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .conn-label { color: #53647d; font-size: 12px; font-weight: 650; white-space: nowrap; }
+  .conn-code { display: inline-flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; padding: 6px 10px; border: 1px solid #e4e9f1; border-radius: 8px; background: #f7f9fc; color: #275bc2; font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .conn-code span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .conn-copy { min-height: 30px; padding: 0 10px; font-size: 12px; }
+  .conn-note { width: 100%; margin: 0; color: #8794a6; font-size: 11px; line-height: 1.55; }
   .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 12px; margin: 0 2px 12px; }
   .section-heading h2 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
   .section-heading p { margin: 0; color: var(--muted); font-size: 12px; }
@@ -237,6 +244,15 @@ const script = `
     return Math.max(1, Math.ceil((next - now.getTime()) / 86400000));
   }
 
+  function initConnHint() {
+    const url = location.origin + '/dav/';
+    el('dav-url').textContent = url;
+    el('copy-dav').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(url); } catch { /* 剪贴板不可用时忽略 */ }
+      notify('WebDAV 地址已复制');
+    });
+  }
+
   function quotaCard(title, used, total, unit, icon, spark) {
     const ratio = total > 0 ? Math.min(1, used / total) : 0;
     const percent = Math.round(ratio * 100);
@@ -386,6 +402,7 @@ const script = `
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '加载失败');
       currentPath = data.path || [];
+      el('dav-user').textContent = data.username || 'webdav';
       renderQuota(data.usage);
       renderEntries(data.entries);
       renderBreadcrumbs(data.path || []);
@@ -402,6 +419,7 @@ const script = `
   function initialize() {
     const value = decodeURIComponent(location.hash.slice(1));
     currentPath = value ? value.split('/') : [];
+    initConnHint();
     loadFiles();
   }
 
@@ -501,6 +519,11 @@ export function webPage(nonce: string): string {
     <div class="brand"><div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 7.5A2.5 2.5 0 0 1 7.5 5H11l2 2h3.5A2.5 2.5 0 0 1 19 9.5v7a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 16.5z"/><path d="M5 10h14"/><path d="M9 14h6"/></svg></div><div><p class="eyebrow">OBJECT STORAGE · CONTROL CENTER</p><h1>CF Free WebDAV</h1><div class="sub">浏览和管理 R2 文件，随时掌握存储用量</div></div></div>
     <div class="actions"><button id="refresh"><svg class="btn-icon" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.8-3L4 10"/><path d="M4 5v5h5M4 13a8 8 0 0 0 14.8 3L20 14"/><path d="M20 19v-5h-5"/></svg>刷新列表</button><button id="sync" class="primary"><svg class="btn-icon" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M5.6 9A7 7 0 0 1 18 6l2 6M4 12l2 6a7 7 0 0 0 12.4-3"/></svg>同步官方用量</button></div>
   </header>
+  <div class="conn-hint">
+    <div class="conn-item"><span class="conn-label">WebDAV 地址</span><code class="conn-code"><span id="dav-url"></span></code><button id="copy-dav" class="conn-copy"><svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9"/></svg>复制</button></div>
+    <div class="conn-item"><span class="conn-label">用户名</span><code class="conn-code"><span id="dav-user">webdav</span></code></div>
+    <p class="conn-note">电脑访达 / 资源管理器 / 手机文件 App 的“连接服务器”里填上面的地址，密码就是登录本页的密码。客户端连接时地址必须带末尾的 /dav。</p>
+  </div>
   <section class="overview" aria-labelledby="usage-title">
     <div class="section-heading"><h2 id="usage-title">用量概览</h2><p>当前周期的额度使用情况</p></div>
     <div id="quota" class="quota-grid"><article class="quota"><div class="quota-label">正在加载用量…</div></article><article class="quota"><div class="quota-label">正在加载用量…</div></article><article class="quota"><div class="quota-label">正在加载用量…</div></article></div>

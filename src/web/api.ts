@@ -47,6 +47,7 @@ export async function apiFiles(request: Request, env: Env, usage: UsageClient): 
     return Response.json(
       {
         path: path.segments,
+        username: env.WEBDAV_USERNAME || "webdav",
         entries: entries.sort((left, right) =>
           left.collection !== right.collection ? Number(right.collection) - Number(left.collection) : left.name.localeCompare(right.name),
         ),

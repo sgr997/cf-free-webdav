@@ -13,9 +13,16 @@
     "QUOTA_THRESHOLD_PERCENT": "0.8",
     "R2_BUCKET_NAME": "cf-free-webdav-files"
   },
+  "routes": [
+    {
+      "pattern": "webdav.goku.top",
+      "custom_domain": true
+    }
+  ],
   "r2_buckets": [
     {
-      "binding": "FILES"
+      "binding": "FILES",
+      "bucket_name": "cf-free-webdav-files"
     }
   ],
   "durable_objects": {
