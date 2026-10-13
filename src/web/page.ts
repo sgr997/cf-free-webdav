@@ -215,6 +215,11 @@ const script = `
     return new Date(value).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
   }
 
+  function fmtMod(value) {
+    const time = new Date(value).getTime();
+    return Number.isFinite(time) && time > 0 ? fmtDate(value) : '—';
+  }
+
   function sparkline(values, maxValue) {
     if (!values.length || !maxValue) return '';
     const width = 120; const height = 28;
@@ -337,7 +342,7 @@ const script = `
       const action = '<button data-rename="' + safeKey + '" aria-label="重命名 ' + attr(item.name) + '">重命名</button>' +
         '<button data-delete="' + safeKey + '" aria-label="删除 ' + attr(item.name) + '">删除</button>' + shareButton;
       return '<tr class="row"><td data-label="名称">' + name + '</td><td data-label="大小">' + (item.collection ? '—' : fmtSize(item.size)) + '</td><td data-label="创建时间">' +
-        (item.createdAt ? fmtDate(item.createdAt) : '—') + '</td><td data-label="修改时间">' + fmtDate(item.uploaded) + '</td><td data-label="操作">' + action + '</td></tr>';
+        (item.createdAt ? fmtDate(item.createdAt) : '—') + '</td><td data-label="修改时间">' + fmtMod(item.uploaded) + '</td><td data-label="操作">' + action + '</td></tr>';
     }).join('');
   }
 

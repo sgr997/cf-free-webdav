@@ -110,11 +110,20 @@ export async function listChildren(
       }
     }
 
+    const markerKeys: string[] = [];
     for (const directoryPrefix of page.delimitedPrefixes) {
       const childKey = directoryPrefix.slice(prefix.length).replace(/\/$/, "");
       if (!childKey || childKey.includes("/")) continue;
       const key = `${collectionKey ? `${collectionKey}/` : ""}${childKey}`;
-      if (!resources.has(key)) resources.set(key, impliedCollection(key));
+      if (!resources.has(key)) markerKeys.push(key);
+    }
+    if (markerKeys.length) {
+      const markers = await Promise.all(
+        markerKeys.map(async (key) => [key, await bucket.head(`${key}/`)] as const),
+      );
+      for (const [key, marker] of markers) {
+        resources.set(key, marker ? fromObject(marker, key, true) : impliedCollection(key));
+      }
     }
 
     if (resources.size > MAX_TREE_OBJECTS) throw new StorageLimitError();
