@@ -374,9 +374,19 @@ const script = `
       link.addEventListener('click', (event) => {
         event.preventDefault();
         const next = link.dataset.empty === undefined ? segments.slice(0, Number(link.dataset.index) + 1) : [];
-        location.hash = encodeURIComponent(next.join('/'));
+        navigate(next);
       });
     });
+  }
+
+  function navigate(segments) {
+    const hash = encodeURIComponent(segments.join('/'));
+    const url = location.pathname + location.search + (hash ? '#' + hash : '');
+    // 用 pushState 而不是 location.hash：location.hash 置空会让浏览器滚回页面顶部（无锚点导航即滚到文档头），
+    // pushState 不触发滚动；popstate/hashchange 统一在这里转入 initialize。
+    if (url === location.pathname + location.search + location.hash) return;
+    history.pushState(null, '', url);
+    initialize();
   }
 
   function renderEntries(entries) {
@@ -927,7 +937,7 @@ const script = `
     const revokeInbox = event.target.closest('[data-revoke-inbox]');
     const revokeGallery = event.target.closest('[data-revoke-gallery]');
     const copyGallery = event.target.closest('[data-copy-gallery]');
-    if (dir) { event.preventDefault(); location.hash = encodeURIComponent(dir.dataset.dir || ''); }
+    if (dir) { event.preventDefault(); navigate(dir.dataset.dir.split('/')); }
     else if (del) { event.preventDefault(); try { if (await remove(del.dataset.delete)) loadFiles(); } catch (error) { notify(error.message || '删除失败', true); } }
     else if (ren) { event.preventDefault(); try { await rename(ren.dataset.rename); loadFiles(); } catch (error) { notify(error.message || '重命名失败', true); } }
     else if (shareButton) { event.preventDefault(); share(shareButton.dataset.share).catch((error) => notify(error.message || '分享失败', true)); }
@@ -1054,6 +1064,7 @@ const script = `
   });
   ${fileMapScript}
   window.addEventListener('hashchange', initialize);
+  window.addEventListener('popstate', initialize);
   initialize();
 `;
 
