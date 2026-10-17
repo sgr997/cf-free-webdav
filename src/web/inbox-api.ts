@@ -168,21 +168,15 @@ export async function handleInboxPublic(
   let written = false;
   let recorded = false;
   let committed = false;
-  let received = 0;
   try {
     reservationId = await usage.reserve(expectedSize, 1, 0);
-    const limitedBody = request.body?.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
-      transform(chunk, controller) {
-        received += chunk.byteLength;
-        if (received > MAX_UPLOAD_BYTES || received > expectedSize) throw new Error("Upload exceeds its declared size.");
-        controller.enqueue(chunk);
-      },
-    }));
-    const object = await env.FILES.put(objectKey, limitedBody || new Uint8Array(), {
+    // 与 WebDAV PUT 一致：直接写 request.body。中间 pipeThrough 普通 TransformStream 会丢失已知长度，
+    // 生产环境 R2 put 报"must have a known length"500（Node 测试 mock 不校验所以测不出来）。
+    const object = await env.FILES.put(objectKey, request.body || new Uint8Array(), {
       httpMetadata: { contentType: "application/octet-stream" },
     });
     written = true;
-    if (received !== expectedSize || object.size !== expectedSize) throw new Error("Upload size did not match Content-Length.");
+    if (object.size !== expectedSize) throw new Error("Upload size did not match Content-Length.");
     const item = {
       id: objectKey.slice(objectKey.lastIndexOf("/") + 1), linkId: inbox.id, objectKey,
       name, size: object.size, uploadedAt: new Date().toISOString(),
