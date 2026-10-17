@@ -16,4 +16,5 @@ interface Env {
   FEISHU_WEBHOOK_SECRET?: string;
   FEISHU_ALERT_PERCENT?: string;
   R2_BUCKET_NAME?: string;
+  TRASH_RETENTION_DAYS?: string;
 }

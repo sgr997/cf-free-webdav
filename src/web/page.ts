@@ -1,6 +1,8 @@
+import { fileMapStyle, fileMapMarkup, fileMapScript } from "./file-map.js";
 const style = `
   :root { color-scheme: light; --canvas: #f3f6fb; --surface: #fff; --line: #e5eaf2; --muted: #64748b; --text: #17243a; --blue: #2563eb; --blue-dark: #1d4ed8; --red: #dc4545; --green: #16865b; --amber: #d58a16; }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
   body { margin: 0; min-width: 320px; background: radial-gradient(ellipse at 16% 0%, #e7efff 0, transparent 34rem), var(--canvas); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; -webkit-font-smoothing: antialiased; }
   button, input { font: inherit; }
   button, a, label { -webkit-tap-highlight-color: transparent; }
@@ -61,11 +63,8 @@ const style = `
   .fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, #4b83f4, #2862db); transition: width .25s ease; }
   .fill.warn { background: linear-gradient(90deg, #edbd59, #d68d1b); }
   .fill.danger { background: linear-gradient(90deg, #ed7777, #d94343); }
-  .spark-wrap { margin: 10px 0 2px; }
-  .spark { display: block; width: 100%; height: 34px; }
-  .spark-line { fill: none; stroke: #4b83f4; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .spark-area { fill: #4b83f41a; stroke: none; }
-  .spark circle { fill: #2862db; }
+  .quota-trend { display: flex; justify-content: space-between; gap: 8px; margin: 12px 0 2px; color: #65758c; font-size: 11px; }
+  .quota-trend strong { color: #33445c; font-weight: 650; font-variant-numeric: tabular-nums; }
   .quota-foot { display: flex; justify-content: space-between; gap: 8px; color: #65758c; font-size: 11px; }
   .quota-foot strong { color: #33445c; font-weight: 650; }
   .panel { overflow: hidden; border: 1px solid var(--line); border-radius: 17px; background: var(--surface); box-shadow: 0 8px 26px #1e3a5f0b; }
@@ -80,11 +79,20 @@ const style = `
   .status.error { color: #a74141; }
   .status.error .status-dot { background: #d84848; box-shadow: 0 0 0 3px #ffebeb; }
   .toolbar { display: flex; align-items: center; gap: 12px; padding: 12px 22px; border-top: 1px solid #edf0f5; border-bottom: 1px solid #edf0f5; background: #fbfcfe; }
+  .view-tabs { display: flex; gap: 6px; padding: 10px 22px 0; border-top: 1px solid #edf0f5; }
+  .view-tabs button { min-height: 36px; padding: 0 13px; border-color: transparent; border-radius: 8px 8px 0 0; background: transparent; color: #66768d; }
+  .view-tabs button.active { border-color: #e5eaf2; border-bottom-color: #fff; background: #fff; color: var(--blue); }
   .breadcrumbs { display: flex; align-items: center; flex: 1; min-width: 0; gap: 5px; overflow: auto; color: #8a98ab; white-space: nowrap; scrollbar-width: thin; }
   .breadcrumbs a { padding: 6px 8px; border-radius: 7px; color: #53647d; font-size: 12px; text-decoration: none; }
   .breadcrumbs a:hover { background: #edf3ff; color: var(--blue); }
   .breadcrumbs a:first-child { color: #275bc2; font-weight: 650; }
   .toolbar-tools { display: flex; align-items: center; gap: 9px; flex: 0 0 auto; }
+  .toolbar select { height: 40px; padding: 0 30px 0 11px; border: 1px solid #dfe6ef; border-radius: 9px; background: #fff; color: #53647d; font-size: 12px; }
+  .bulk-actions { display: none; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 22px; border-bottom: 1px solid #edf0f5; color: #53647d; font-size: 12px; }
+  .bulk-actions.show { display: flex; }
+  .bulk-actions span { margin-right: auto; font-weight: 650; }
+  .bulk-actions button { min-height: 34px; padding: 0 11px; }
+  .danger { color: var(--red) !important; }
   .search { position: relative; display: flex; align-items: center; }
   .search svg { position: absolute; left: 11px; width: 15px; height: 15px; color: #8492a6; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; pointer-events: none; }
   .search input { width: 190px; height: 40px; padding: 0 12px 0 34px; border: 1px solid #dfe6ef; border-radius: 10px; outline: none; background: #fff; color: var(--text); font-size: 12px; transition: border-color .18s ease, box-shadow .18s ease; }
@@ -101,7 +109,7 @@ const style = `
   th, td { padding: 13px 20px; border-bottom: 1px solid #edf0f5; text-align: left; font-size: 13px; }
   th { position: sticky; top: 0; z-index: 1; background: #f8fafd; color: #728198; font-size: 11px; font-weight: 700; letter-spacing: .02em; white-space: nowrap; }
   td { color: #56677e; }
-  td:first-child { min-width: 260px; color: #263851; font-weight: 560; }
+  td:nth-child(2) { min-width: 240px; color: #263851; font-weight: 560; }
   td:last-child, th:last-child { width: 94px; text-align: right; white-space: nowrap; }
   .row:hover td { background: #f8faff; }
   td a { color: inherit; text-decoration: none; }
@@ -112,6 +120,8 @@ const style = `
   .row button { min-height: 32px; padding: 0 10px; border-color: transparent; background: transparent; color: #8794a6; font-size: 12px; font-weight: 550; }
   .row button:hover { border-color: #f4caca; background: #fff4f4; color: var(--red); }
   .row button:disabled { color: #aeb7c4; cursor: not-allowed; }
+  .row-check, #select-page { width: 16px; height: 16px; accent-color: var(--blue); vertical-align: middle; }
+  .subline { display: block; margin-top: 4px; color: #8a98ab; font-size: 10px; font-weight: 450; overflow-wrap: anywhere; }
   .empty-cell { padding: 60px 24px !important; text-align: center !important; color: #7b8aa0 !important; font-weight: 450 !important; }
   .empty-icon { display: block; width: 36px; height: 36px; margin: 0 auto 10px; color: #9aa9bc; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
   #message { position: fixed; z-index: 20; left: 50%; bottom: 22px; max-width: calc(100vw - 32px); padding: 12px 17px; transform: translateX(-50%); border: 1px solid #ffffff20; border-radius: 12px; background: #17243a; color: #fff; font-size: 13px; box-shadow: 0 12px 32px #14233b30; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
@@ -128,15 +138,40 @@ const style = `
   .ttl-group input:checked + span { display: contents; }
   .ttl-group label:has(input:checked) { border-color: var(--blue); background: #eef4ff; color: var(--blue); }
   .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; }
+  .limit-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 14px; color: #53647d; font-size: 12px; }
+  .limit-field input { width: 120px; height: 36px; padding: 0 9px; border: 1px solid #dfe6ef; border-radius: 8px; }
+  .limit-note { margin: -8px 0 14px; color: #8a98ab; font-size: 10px; line-height: 1.5; }
+  .preview-dialog { width: min(900px, 100%); max-height: min(85vh, 900px); display: flex; flex-direction: column; }
+  #preview-content { min-height: 120px; max-height: 70vh; overflow: auto; display: grid; place-items: center; background: #f5f7fa; border-radius: 8px; }
+  #preview-content img, #preview-content video { max-width: 100%; max-height: 68vh; object-fit: contain; }
+  #preview-content audio { width: min(520px, 100%); }
+  #preview-content pre { width: 100%; margin: 0; padding: 16px; color: #263851; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .preview-heading { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .preview-heading h3 { overflow-wrap: anywhere; }
+  .load-more { display: block; margin: 12px auto; }
   .share-result { display: none; margin-bottom: 16px; }
   .share-result.show { display: block; }
   .share-result textarea { width: 100%; min-height: 74px; padding: 10px 12px; border: 1px solid #dfe6ef; border-radius: 10px; background: #f8fafd; color: var(--text); font: 500 11px ui-monospace, SFMono-Regular, Menlo, monospace; resize: vertical; }
+  ${fileMapStyle}
+  .inbox-links { padding: 18px 22px; border-top: 1px solid #edf0f5; }
+  .inbox-links h3 { margin: 0 0 10px; font-size: 13px; }
+  .inbox-link-row { display: grid; grid-template-columns: minmax(0,1fr) auto auto; align-items: center; gap: 12px; min-height: 56px; padding: 8px 0; border-top: 1px solid #edf0f5; color: #53647d; font-size: 12px; }
+  .inbox-link-row strong { display: block; color: #263851; font-size: 12px; }
+  .inbox-link-row small { display: block; margin-top: 3px; color: #8794a6; font-size: 10px; }
+  .inbox-link-row button { min-height: 34px; }
+  .inbox-link-actions { display: flex; gap: 5px; }
+  .gallery-link { max-width: 280px; overflow-wrap: anywhere; color: #245ac0; font-size: 11px; }
+  .text-field { display: block; margin: 0 0 14px; color: #53647d; font-size: 12px; }
+  .text-field input { display: block; width: 100%; height: 40px; margin-top: 6px; padding: 0 10px; border: 1px solid #dfe6ef; border-radius: 8px; color: var(--text); }
+  .mode-options { display: flex; gap: 8px; margin: 0 0 16px; }
+  .mode-options label { display: flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 12px; border: 1px solid #dfe6ef; border-radius: 8px; color: #53647d; font-size: 12px; }
+  .mode-options input { accent-color: var(--blue); }
   .upload-progress { display: none; align-items: center; gap: 10px; margin: 0 22px 12px; color: #53647d; font-size: 12px; }
   .upload-progress.show { display: flex; }
   .upload-progress .bar { flex: 1; height: 6px; margin: 0; }
   .tablewrap.dragover { outline: 2px dashed #8eaff4; outline-offset: -6px; background: #f4f8ff; }
   .footer-note { margin: 13px 4px 0; color: #8794a6; font-size: 11px; line-height: 1.6; }
-  @media (max-width: 900px) { .app { padding: 28px 22px 48px; } .quota { padding: 16px; } .quota-value { font-size: 22px; } .search input { width: 160px; } }
+  @media (max-width: 900px) { .app { padding: 28px 22px 48px; } .quota { padding: 16px; } .quota-value { font-size: 22px; } .search input { width: 160px; } .toolbar { flex-wrap: wrap; } #search-tools, #file-tools { flex: 1 1 100%; } #file-tools { flex-wrap: wrap; } }
   @media (max-width: 680px) {
     .app { padding: 22px 14px 36px; }
     .page-header { align-items: flex-start; flex-direction: column; gap: 16px; margin-bottom: 23px; }
@@ -168,11 +203,23 @@ const style = `
     .table tr.row:last-child { margin-bottom: 10px; }
     .table td { min-width: 0; padding: 7px 0; border: 0; font-size: 11px; overflow-wrap: anywhere; }
     .table td::before { display: block; margin-bottom: 4px; color: #91a0b3; content: attr(data-label); font-size: 10px; font-weight: 600; }
-    .table td:first-child { grid-column: 1 / -1; padding-bottom: 10px; font-size: 13px; }
-    .table td:first-child::before { margin-bottom: 6px; }
-    .table td:last-child { grid-column: 1 / -1; width: auto; padding-top: 5px; border-top: 1px solid #f0f2f6; text-align: right; }
-    .table td:last-child::before { display: none; }
-    .table td:nth-child(3) { display: none; }
+    .table td:nth-child(1) { grid-column: 1 / -1; justify-self: start; padding: 2px 0; }
+    .table td:nth-child(1)::before { display: none; }
+    .table td:nth-child(2) { grid-column: 1 / -1; min-width: 0; padding-bottom: 10px; font-size: 13px; }
+    .table td:nth-child(2)::before { margin-bottom: 6px; }
+    .table td:nth-child(6) { grid-column: 1 / -1; width: auto; padding-top: 5px; border-top: 1px solid #f0f2f6; text-align: right; }
+    .table td:nth-child(6)::before { display: none; }
+    .table[data-view="files"] td:nth-child(4) { display: none; }
+    .view-tabs { padding-right: 13px; padding-left: 13px; overflow-x: auto; }
+    .toolbar { padding-right: 13px; padding-left: 13px; }
+    .toolbar-tools { flex-wrap: wrap; }
+    .toolbar select { flex: 0 0 100%; }
+    .bulk-actions { padding-right: 13px; padding-left: 13px; }
+    .inbox-links { padding-right: 13px; padding-left: 13px; }
+    .inbox-link-row { grid-template-columns: minmax(0,1fr) auto; }
+    .inbox-link-row > span:nth-child(2) { grid-column: 1; }
+    .inbox-link-row button { grid-column: 2; grid-row: 1 / span 2; }
+    .inbox-link-row .inbox-link-actions { grid-column: 2; grid-row: 1 / span 2; flex-direction: column; }
     .row button { min-height: 34px; padding: 0 10px; }
     .empty-cell { display: block !important; padding: 48px 20px !important; border: 0 !important; }
     .footer-note { margin-top: 10px; }
@@ -185,8 +232,20 @@ const script = `
   const el = (id) => document.getElementById(id);
   let currentPath = [];
   let currentEntries = [];
+  let currentTrash = [];
+  let currentShares = [];
+  let currentInboxes = [];
+  let currentInboxItems = [];
+  let currentGalleries = [];
   let trendDays = [];
   let currentUsage = null;
+  let currentView = 'files';
+  let searchCursor = null;
+  let searchController = null;
+  let searchTimer = 0;
+  let currentSort = 'name';
+  let selected = new Set();
+  let viewRequest = 0;
   const dirIcon = '<svg class="icon" viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><path d="M3.5 10h17"/></svg>';
   const fileIcon = '<svg class="icon file-icon" viewBox="0 0 24 24"><path d="M6 3.5h7l5 5v12H6a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z"/><path d="M13 3.5v5h5M8 13h8M8 16.5h8"/></svg>';
 
@@ -195,6 +254,12 @@ const script = `
   const basicHeader = (user, pass) => 'Basic ' + btoa(String.fromCharCode(...new TextEncoder().encode(user + ':' + pass)));
   const apiPath = (segments) => '/api/files?path=' + encodeURIComponent(segments.join('/'));
   const davPath = (segments) => '/dav/' + segments.map(encodeURIComponent).join('/');
+  const previewPath = (key) => '/api/preview?' + new URLSearchParams({ path: key });
+  const isPreviewable = (item) => {
+    const type = (item.contentType || '').toLowerCase();
+    const mime = type.split(';')[0].trim();
+    return ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/avif', 'text/plain'].includes(mime) || mime.startsWith('audio/') || mime.startsWith('video/');
+  };
 
   async function davRequest(segments, method, options = {}) {
     const response = await fetch(davPath(segments), { method, ...options });
@@ -220,23 +285,20 @@ const script = `
     return Number.isFinite(time) && time > 0 ? fmtDate(value) : '—';
   }
 
-  function sparkline(values, maxValue) {
-    if (!values.length || !maxValue) return '';
-    const width = 120; const height = 28;
-    const step = values.length > 1 ? width / (values.length - 1) : 0;
-    const points = values.map((value, index) => {
-      const x = values.length > 1 ? index * step : width / 2;
-      const y = height - Math.min(1, value / maxValue) * (height - 5) - 2.5;
-      return { x, y };
-    });
-    const line = 'M' + points.map((p) => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' L');
-    const dots = points
-      .slice(-30)
-      .map((p) => '<circle cx="' + p.x.toFixed(1) + '" cy="' + p.y.toFixed(1) + '" r="2"/>')
-      .join('');
-    const area = values.length > 1 ? '<path class="spark-area" d="' + line + ' L' + width + ',' + height + ' L0,' + height + ' Z"/>' : '';
-    return '<svg class="spark" viewBox="0 0 ' + width + ' ' + height + '" preserveAspectRatio="none" aria-hidden="true">' +
-      area + '<path class="spark-line" d="' + line + '"/>' + dots + '</svg>';
+  function signed(value, format) {
+    const symbol = value > 0 ? '+' : value < 0 ? '−' : '±';
+    return symbol + format(Math.abs(value));
+  }
+
+  // 额度卡片趋势行：今日增量 + 近 7 日日均，替代低用量下没有信息量的折线图
+  function trendRow(days, pick, format) {
+    if (days.length < 2) return '';
+    const last = pick(days[days.length - 1]) - pick(days[days.length - 2]);
+    const span = Math.min(7, days.length - 1);
+    let sum = 0;
+    for (let i = days.length - span; i < days.length; i++) sum += pick(days[i]) - pick(days[i - 1]);
+    return '<div class="quota-trend"><span>今日 <strong>' + signed(last, format) + '</strong></span>' +
+      '<span>近 7 日日均 <strong>' + signed(sum / span, format) + '</strong></span></div>';
   }
 
   async function loadTrend() {
@@ -262,12 +324,6 @@ const script = `
     el('login').classList.add('show');
   }
 
-  function daysUntilReset() {
-    const now = new Date();
-    const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
-    return Math.max(1, Math.ceil((next - now.getTime()) / 86400000));
-  }
-
   function initConnHint() {
     const url = location.origin + '/dav/';
     el('dav-url').textContent = url;
@@ -277,7 +333,13 @@ const script = `
     });
   }
 
-  function quotaCard(title, used, total, unit, icon, spark) {
+  function daysUntilReset() {
+    const now = new Date();
+    const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1);
+    return Math.max(1, Math.ceil((next - now.getTime()) / 86400000));
+  }
+
+  function quotaCard(title, used, total, unit, icon, trend) {
     const ratio = total > 0 ? Math.min(1, used / total) : 0;
     const percent = Math.round(ratio * 100);
     const tone = percent >= 90 ? 'danger' : percent >= 75 ? 'warn' : '';
@@ -289,23 +351,18 @@ const script = `
       '<span class="quota-percent ' + tone + '">' + percent + '% 已用</span></div>' +
       '<div class="quota-value">' + format(used) + '</div><div class="quota-limit">上限 ' + format(total) + '</div>' +
       '<div class="bar"><div class="fill ' + tone + '" style="width:' + percent + '%"></div></div>' +
-      (spark ? '<div class="spark-wrap">' + spark + '</div>' : '') +
+      (trend || '') +
       '<div class="quota-foot"><span>' + resetLabel + '重置</span><span>剩余 <strong>' + format(remaining) + '</strong></span></div></article>';
   }
 
   function renderQuota(usage) {
     currentUsage = usage;
     const limits = usage.limits;
-    const trendFor = (pick) => {
-      const days = trendDays.slice(-30);
-      return { values: days.map(pick), max: limits };
-    };
-    const storageTrend = trendFor((day) => day.storageBytes);
-    const classATrend = trendFor((day) => day.classAOperations);
-    const classBTrend = trendFor((day) => day.classBOperations);
-    el('quota').innerHTML = quotaCard('存储空间', usage.state.storageBytes, limits.storageBytes, '字节', '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="3"/><path d="M4.5 5.5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6M4.5 11.5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg>', sparkline(storageTrend.values, limits.storageBytes)) +
-      quotaCard('A 类操作', usage.state.classAOperations, limits.classAOperations, '次', '<svg viewBox="0 0 24 24"><path d="M12 3v18M17 7.5c0-1.7-2-3-5-3S7 6 7 8s1.7 3 5 4 5 2.3 5 4-2 3.5-5 3.5-5-1.4-5-3.5"/></svg>', sparkline(classATrend.values, limits.classAOperations)) +
-      quotaCard('B 类操作', usage.state.classBOperations, limits.classBOperations, '次', '<svg viewBox="0 0 24 24"><path d="M4 18V6M4 18h16M8 15l3-4 3 2 5-7"/><path d="M16 6h3v3"/></svg>', sparkline(classBTrend.values, limits.classBOperations));
+    const days = trendDays.slice(-31);
+    const trendFor = (pick, format) => trendRow(days, pick, format);
+    el('quota').innerHTML = quotaCard('存储空间', usage.state.storageBytes, limits.storageBytes, '字节', '<svg viewBox="0 0 24 24"><ellipse cx="12" cy="5.5" rx="7.5" ry="3"/><path d="M4.5 5.5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6M4.5 11.5v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg>', trendFor((day) => day.storageBytes, fmtSize)) +
+      quotaCard('A 类操作', usage.state.classAOperations, limits.classAOperations, '次', '<svg viewBox="0 0 24 24"><path d="M12 3v18M17 7.5c0-1.7-2-3-5-3S7 6 7 8s1.7 3 5 4 5 2.3 5 4-2 3.5-5 3.5-5-1.4-5-3.5"/></svg>', trendFor((day) => day.classAOperations, (value) => Math.round(value).toLocaleString('zh-CN'))) +
+      quotaCard('B 类操作', usage.state.classBOperations, limits.classBOperations, '次', '<svg viewBox="0 0 24 24"><path d="M4 18V6M4 18h16M8 15l3-4 3 2 5-7"/><path d="M16 6h3v3"/></svg>', trendFor((day) => day.classBOperations, (value) => Math.round(value).toLocaleString('zh-CN')));
     document.title = usage.blocked ? 'CF Free WebDAV - 熔断' : 'CF Free WebDAV';
   }
 
@@ -324,26 +381,41 @@ const script = `
 
   function renderEntries(entries) {
     currentEntries = entries;
-    const query = el('search').value.trim().toLocaleLowerCase('zh-CN');
-    const visibleEntries = entries.filter((item) => item.name.toLocaleLowerCase('zh-CN').includes(query));
-    el('entry-count').textContent = query ? visibleEntries.length + ' / ' + entries.length + ' 个项目' : entries.length + ' 个项目';
+    if (currentView === 'files') {
+      const visibleKeys = new Set(entries.map((item) => item.key));
+      selected = new Set([...selected].filter((key) => visibleKeys.has(key)));
+    }
+    const visibleEntries = [...entries].sort((a, b) => {
+      if (currentSort === 'size') return (b.size || 0) - (a.size || 0);
+      if (currentSort === 'updated') return new Date(b.uploaded) - new Date(a.uploaded);
+      if (currentSort === 'created') return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      if (currentSort === 'type') return (a.contentType || '').localeCompare(b.contentType || '') || a.name.localeCompare(b.name, 'zh-CN');
+      return a.collection !== b.collection ? Number(b.collection) - Number(a.collection) : a.name.localeCompare(b.name, 'zh-CN');
+    });
+    el('entry-count').textContent = visibleEntries.length + ' 个项目' + (searchCursor ? ' · 可继续加载' : '');
+    el('table').dataset.view = 'files';
+    el('table-head').innerHTML = '<tr><th><input id="select-page" type="checkbox" aria-label="选择当前页"></th><th>名称</th><th>大小</th><th>创建时间</th><th>修改时间</th><th>操作</th></tr>';
     if (!visibleEntries.length) {
-      const message = entries.length ? '没有找到匹配的文件' : '此目录还没有文件';
-      el('rows').innerHTML = '<tr><td colspan="5" class="empty-cell"><svg class="empty-icon" viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H10l2 2h5.5A2.5 2.5 0 0 1 20 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 17.5z"/><path d="M8 13h8"/></svg>' + message + '</td></tr>';
+      const message = el('search').value.trim() ? '没有找到匹配的文件' : '此目录还没有文件';
+      el('rows').innerHTML = '<tr><td colspan="6" class="empty-cell"><svg class="empty-icon" viewBox="0 0 24 24"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H10l2 2h5.5A2.5 2.5 0 0 1 20 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 4 7.5z"/><path d="M8 13h8"/></svg>' + message + '</td></tr>';
+      renderBulkState();
       return;
     }
     el('rows').innerHTML = visibleEntries.map((item) => {
       const safeHref = attr(item.href);
       const safeKey = attr(item.key);
+      const checked = selected.has(item.key) ? ' checked' : '';
       const name = item.collection
         ? '<a href="#" data-dir="' + safeKey + '">' + dirIcon + esc(item.name) + '</a>'
         : '<a href="' + safeHref + '" target="_blank" rel="noopener">' + fileIcon + esc(item.name) + '</a>';
       const shareButton = item.collection ? '' : '<button data-share="' + safeKey + '" aria-label="分享 ' + attr(item.name) + '">分享</button>';
+      const previewButton = !item.collection && isPreviewable(item) ? '<button data-preview="' + safeKey + '" aria-label="预览 ' + attr(item.name) + '">预览</button>' : '';
       const action = '<button data-rename="' + safeKey + '" aria-label="重命名 ' + attr(item.name) + '">重命名</button>' +
-        '<button data-delete="' + safeKey + '" aria-label="删除 ' + attr(item.name) + '">删除</button>' + shareButton;
-      return '<tr class="row"><td data-label="名称">' + name + '</td><td data-label="大小">' + (item.collection ? '—' : fmtSize(item.size)) + '</td><td data-label="创建时间">' +
+        '<button data-delete="' + safeKey + '" aria-label="移至回收站 ' + attr(item.name) + '">删除</button>' + previewButton + shareButton;
+      return '<tr class="row"><td data-label="选择"><input class="row-check" type="checkbox" data-select="' + safeKey + '"' + checked + ' aria-label="选择 ' + attr(item.name) + '"></td><td data-label="名称">' + name + '</td><td data-label="大小">' + (item.collection ? '—' : fmtSize(item.size)) + '</td><td data-label="创建时间">' +
         (item.createdAt ? fmtDate(item.createdAt) : '—') + '</td><td data-label="修改时间">' + fmtMod(item.uploaded) + '</td><td data-label="操作">' + action + '</td></tr>';
     }).join('');
+    renderBulkState();
   }
 
   async function upload(file) {
@@ -371,7 +443,7 @@ const script = `
   }
 
   async function remove(key) {
-    if (!confirm('确定删除 ' + key.split('/').pop() + ' 吗？')) return false;
+    if (!confirm('将 ' + key.split('/').pop() + ' 移至回收站？')) return false;
     await davRequest(key.split('/'), 'DELETE');
     notify('已删除');
     return true;
@@ -382,7 +454,8 @@ const script = `
     const newName = prompt('重命名为：', oldName);
     if (!newName || newName === oldName) return;
     if (newName.includes('/') || newName.includes(String.fromCharCode(92))) { notify('名称不能包含 / 或反斜杠', true); return; }
-    const segments = key.split('/');    const destination = [...currentPath, newName];
+    const segments = key.split('/');
+    const destination = [...segments.slice(0, -1), newName];
     await davRequest(segments, 'MOVE', { headers: { destination: new URL(davPath(destination), location.origin).href } });
     notify('已重命名');
   }
@@ -399,6 +472,7 @@ const script = `
     el('share-file').textContent = key.split('/').pop();
     el('share-result').className = 'share-result';
     el('share-url').value = '';
+    el('share-limit').value = '';
     el('share-backdrop').classList.add('show');
     el('share-create').dataset.shareKey = key;
     const checked = el('share-ttl').querySelector('input:checked');
@@ -409,15 +483,313 @@ const script = `
   async function createShare(key, ttlHours) {
     const response = await fetch('/api/share', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ path: key, ttlHours }),
+      body: JSON.stringify({ path: key, ttlHours, maxDownloads: el('share-limit').value ? Number(el('share-limit').value) : null }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || '生成失败');
     return data.url;
   }
 
+  function openInboxDialog() {
+    el('inbox-result').className = 'share-result';
+    el('inbox-url').value = '';
+    el('inbox-context').textContent = '目标目录：/' + currentPath.join('/') + '。上传内容需手动确认，已有文件不会被覆盖。';
+    el('inbox-backdrop').classList.add('show');
+  }
+
+  async function createInboxLink() {
+    const ttlHours = Number(el('inbox-ttl').value);
+    const data = await apiAction('/api/inboxes', 'POST', { folder: currentPath.join('/'), ttlHours });
+    el('inbox-url').value = data.url;
+    el('inbox-result').className = 'share-result show';
+    el('inbox-url').select();
+    document.execCommand('copy');
+    notify('收件链接已生成并复制');
+  }
+
+  function openGalleryDialog() {
+    el('gallery-result').className = 'share-result';
+    el('gallery-url').value = '';
+    el('gallery-title-input').value = currentPath[currentPath.length - 1] || '';
+    el('gallery-context').textContent = '发布目录：/' + currentPath.join('/') + '。HTML、脚本和 SVG 不会公开。';
+    el('gallery-backdrop').classList.add('show');
+  }
+
+  async function createGallery() {
+    const mode = el('gallery-mode').querySelector('input:checked').value;
+    const data = await apiAction('/api/galleries', 'POST', {
+      folder: currentPath.join('/'), mode, title: el('gallery-title-input').value.trim(),
+    });
+    el('gallery-url').value = data.url;
+    el('gallery-result').className = 'share-result show';
+    el('gallery-url').select();
+    document.execCommand('copy');
+    notify('公开主页已生成并复制');
+  }
+
+  function renderBulkState() {
+    const bar = el('bulk-actions');
+    if (!['files', 'trash', 'shares'].includes(currentView)) { bar.className = 'bulk-actions'; bar.innerHTML = ''; return; }
+    if (!selected.size) { bar.className = 'bulk-actions'; bar.innerHTML = ''; return; }
+    let actions = '';
+    if (currentView === 'files') actions = '<button class="danger" data-bulk="trash">移至回收站</button>';
+    else if (currentView === 'trash') actions = '<button data-bulk="restore">恢复</button><button class="danger" data-bulk="purge">永久删除</button>';
+    else actions = '<button class="danger" data-bulk="revoke">撤销链接</button>';
+    bar.className = 'bulk-actions show';
+    bar.innerHTML = '<span>已选 ' + selected.size + ' 项</span><button data-bulk="select-all">全选当前页</button>' + actions + '<button data-bulk="clear">取消选择</button>';
+  }
+
+  function showViewLoading(message) {
+    el('entry-count').textContent = '正在加载';
+    el('table-head').innerHTML = '';
+    el('rows').innerHTML = '<tr><td colspan="6" class="empty-cell">' + message + '</td></tr>';
+    renderBulkState();
+  }
+
+  function renderTrash(items) {
+    currentTrash = items;
+    el('table').dataset.view = 'trash';
+    const visibleIds = new Set(items.map((item) => item.id));
+    selected = new Set([...selected].filter((id) => visibleIds.has(id)));
+    el('entry-count').textContent = items.length + ' 个项目';
+    el('table-head').innerHTML = '<tr><th><input id="select-page" type="checkbox" aria-label="选择当前页"></th><th>名称 / 路径</th><th>类别</th><th>大小</th><th>保留至</th><th>操作</th></tr>';
+    if (!items.length) {
+      el('rows').innerHTML = '<tr><td colspan="6" class="empty-cell">回收站为空</td></tr>';
+      renderBulkState();
+      return;
+    }
+    el('rows').innerHTML = items.map((item) => {
+      const key = attr(item.id);
+      const checked = selected.has(item.id) ? ' checked' : '';
+      const kind = item.kind === 'version' ? '历史版本' : '已删除';
+      return '<tr class="row"><td data-label="选择"><input class="row-check" type="checkbox" data-select="' + key + '"' + checked + ' aria-label="选择 ' + attr(item.name) + '"></td>' +
+        '<td data-label="名称 / 路径"><strong>' + esc(item.name) + '</strong><small class="subline">' + esc(item.key) + '</small></td>' +
+        '<td data-label="类别">' + kind + '<small class="subline">' + fmtDate(item.createdAt) + '</small></td>' +
+        '<td data-label="大小">' + fmtSize(item.size) + '</td><td data-label="保留至">' + fmtDate(item.expiresAt) + '</td>' +
+        '<td data-label="操作"><button data-restore="' + key + '">恢复</button><button data-purge="' + key + '">永久删除</button></td></tr>';
+    }).join('');
+    renderBulkState();
+  }
+
+  function renderShares(items) {
+    currentShares = items;
+    el('table').dataset.view = 'shares';
+    const visibleIds = new Set(items.map((item) => item.id));
+    selected = new Set([...selected].filter((id) => visibleIds.has(id)));
+    el('entry-count').textContent = items.length + ' 个链接';
+    el('table-head').innerHTML = '<tr><th><input id="select-page" type="checkbox" aria-label="选择当前页"></th><th>文件</th><th>创建时间</th><th>有效期</th><th>访问次数</th><th>操作</th></tr>';
+    if (!items.length) {
+      el('rows').innerHTML = '<tr><td colspan="6" class="empty-cell">暂无分享链接</td></tr>';
+      renderBulkState();
+      return;
+    }
+    el('rows').innerHTML = items.map((item) => {
+      const key = attr(item.id);
+      const checked = selected.has(item.id) ? ' checked' : '';
+      const status = item.revoked ? '已撤销' : Date.parse(item.expiresAt) < Date.now() ? '已过期' : '有效';
+      const access = item.maxDownloads === null ? item.downloads + ' 次 · 不限' : item.downloads + ' / ' + item.maxDownloads;
+      const revoke = item.revoked || status === '已过期' ? '' : '<button data-revoke="' + key + '">撤销</button>';
+      return '<tr class="row"><td data-label="选择"><input class="row-check" type="checkbox" data-select="' + key + '"' + checked + ' aria-label="选择分享链接"></td>' +
+        '<td data-label="文件"><strong>' + esc(item.name) + '</strong><small class="subline">' + esc(item.fileKey) + '</small></td>' +
+        '<td data-label="创建时间">' + fmtDate(item.createdAt) + '</td><td data-label="有效期">' + fmtDate(item.expiresAt) + '<small class="subline">' + status + '</small></td>' +
+        '<td data-label="访问次数">' + access + '<small class="subline">Range 请求也会计次</small></td>' +
+        '<td data-label="操作"><button data-copy-share="' + key + '">复制链接</button>' + revoke + '</td></tr>';
+    }).join('');
+    renderBulkState();
+  }
+
+  function renderInboxes(data) {
+    currentInboxes = data.inboxes || [];
+    currentInboxItems = data.items || [];
+    selected.clear();
+    el('table').dataset.view = 'inbox';
+    el('entry-count').textContent = currentInboxItems.length + ' 个待确认文件';
+    el('table-head').innerHTML = '<tr><th>文件</th><th>收件目录</th><th>大小</th><th>上传时间</th><th>操作</th></tr>';
+    if (!currentInboxItems.length) {
+      el('rows').innerHTML = '<tr><td colspan="5" class="empty-cell">暂无待确认文件</td></tr>';
+    } else {
+      el('rows').innerHTML = currentInboxItems.map((item) => '<tr class="row"><td data-label="文件"><strong>' + esc(item.name) + '</strong></td>' +
+        '<td data-label="收件目录">' + (item.folder ? esc(item.folder) : '根目录') + '</td><td data-label="大小">' + fmtSize(item.size) + '</td>' +
+        '<td data-label="上传时间">' + fmtDate(item.uploadedAt) + '</td><td data-label="操作"><button data-inbox-keep="' + attr(item.id) + '" data-inbox-owner="' + attr(item.linkId) + '">保留</button>' +
+        '<button data-inbox-delete="' + attr(item.id) + '" data-inbox-owner="' + attr(item.linkId) + '" class="danger">删除</button></td></tr>').join('');
+    }
+    el('inbox-links-list').innerHTML = currentInboxes.length ? currentInboxes.map((item) => {
+      const expiresAt = typeof item.expiresAt === 'number' ? item.expiresAt * 1000 : Date.parse(item.expiresAt);
+      const status = item.revoked ? '已撤销' : expiresAt < Date.now() ? '已过期' : '有效';
+      const count = item.uploadCount + ' / 100 次上传 · ' + item.pendingCount + ' 个待确认';
+      const action = status === '有效' ? '<span class="inbox-link-actions"><button data-copy-inbox="' + attr(item.id) + '" data-inbox-url="' + attr(item.url) + '">复制</button><button data-revoke-inbox="' + attr(item.id) + '">撤销</button></span>' : '<button disabled>已结束</button>';
+      return '<div class="inbox-link-row"><span><strong>' + (item.folder ? esc(item.folder) : '根目录') + '</strong><small>' + esc(count) + ' · ' + status + '</small></span>' +
+        '<span>有效至 ' + fmtDate(new Date(expiresAt).toISOString()) + '</span>' + action + '</div>';
+    }).join('') : '<p class="subline">尚未生成收件链接</p>';
+    renderBulkState();
+  }
+
+  function renderGalleries(items) {
+    currentGalleries = items;
+    selected.clear();
+    el('table').dataset.view = 'galleries';
+    el('entry-count').textContent = items.length + ' 个公开主页';
+    el('table-head').innerHTML = '<tr><th>页面</th><th>目录</th><th>项目数</th><th>发布时间</th><th>状态</th><th>操作</th></tr>';
+    if (!items.length) {
+      el('rows').innerHTML = '<tr><td colspan="6" class="empty-cell">暂无公开主页</td></tr>';
+    } else {
+      el('rows').innerHTML = items.map((item) => {
+        const url = location.origin + '/gallery/' + item.id;
+        return '<tr class="row"><td data-label="页面"><strong>' + esc(item.title) + '</strong><small class="subline">' + (item.mode === 'photos' ? '照片墙' : '文件展示') + '</small></td>' +
+          '<td data-label="目录">' + (item.folder ? esc(item.folder) : '根目录') + '</td><td data-label="项目数">' + item.fileCount + '</td>' +
+          '<td data-label="发布时间">' + fmtDate(item.createdAt) + '</td><td data-label="状态">' + (item.revoked ? '已撤销' : '公开') + '</td>' +
+          '<td data-label="操作"><a class="gallery-link" href="' + attr(url) + '" target="_blank" rel="noopener">打开</a>' +
+          '<button data-copy-gallery="' + attr(item.id) + '">复制链接</button>' + (item.revoked ? '' : '<button data-revoke-gallery="' + attr(item.id) + '" class="danger">撤销</button>') + '</td></tr>';
+      }).join('');
+    }
+    renderBulkState();
+  }
+
+  async function loadTrash() {
+    const requestView = ++viewRequest;
+    const response = await fetch('/api/trash', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '回收站加载失败');
+    if (requestView !== viewRequest) return;
+    renderTrash(data.items || []);
+  }
+
+  async function loadShares() {
+    const requestView = ++viewRequest;
+    const response = await fetch('/api/shares', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '分享链接加载失败');
+    if (requestView !== viewRequest) return;
+    renderShares(data.shares || []);
+  }
+
+  async function loadInboxes() {
+    const requestView = ++viewRequest;
+    const response = await fetch('/api/inboxes', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '收件箱加载失败');
+    if (requestView !== viewRequest) return;
+    renderInboxes(data);
+  }
+
+  async function loadGalleries() {
+    const requestView = ++viewRequest;
+    const response = await fetch('/api/galleries', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '公开主页加载失败');
+    if (requestView !== viewRequest) return;
+    renderGalleries(data.galleries || []);
+  }
+
+  async function loadRecursiveSearch(append = false) {
+    const requestView = ++viewRequest;
+    const query = el('search').value.trim();
+    if (!query) { searchCursor = null; return loadFiles(); }
+    if (searchController) searchController.abort();
+    searchController = new AbortController();
+    const params = new URLSearchParams({ q: query, path: currentPath.join('/') });
+    if (append && searchCursor) params.set('cursor', searchCursor);
+    const response = await fetch('/api/search?' + params, { cache: 'no-store', signal: searchController.signal });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '搜索失败');
+    if (requestView !== viewRequest) return;
+    currentEntries = append
+      ? [...new Map(currentEntries.concat(data.entries || []).map((entry) => [entry.key, entry])).values()]
+      : (data.entries || []);
+    searchCursor = data.cursor || null;
+    renderEntries(currentEntries);
+    el('load-more').hidden = !searchCursor;
+  }
+
+  async function switchView(view) {
+    currentView = view;
+    viewRequest++;
+    if (searchController) searchController.abort();
+    searchController = null;
+    selected.clear();
+    document.querySelectorAll('[data-view]').forEach((button) => button.classList.toggle('active', button.dataset.view === view));
+    el('breadcrumbs').hidden = view !== 'files';
+    el('search-tools').hidden = view !== 'files';
+    el('file-tools').hidden = view !== 'files';
+    el('empty-trash').hidden = view !== 'trash';
+    el('inbox-links').hidden = view !== 'inbox';
+    el('search').value = '';
+    searchCursor = null;
+    el('load-more').hidden = true;
+    showViewLoading(view === 'files' ? '正在加载文件列表…' : view === 'trash' ? '正在加载回收站…' : view === 'shares' ? '正在加载分享链接…' : view === 'inbox' ? '正在加载待确认文件…' : '正在加载公开主页…');
+    try {
+      if (view === 'files') await loadFiles();
+      if (view === 'trash') await loadTrash();
+      if (view === 'shares') await loadShares();
+      if (view === 'inbox') await loadInboxes();
+      if (view === 'galleries') await loadGalleries();
+    } catch (error) { notify(error.message || '加载失败', true); }
+  }
+
+  async function openPreview(item) {
+    const content = el('preview-content');
+    el('preview-title').textContent = item.name;
+    content.replaceChildren();
+    el('preview-backdrop').classList.add('show');
+    const type = (item.contentType || '').toLowerCase();
+    const src = previewPath(item.key);
+    if (type.startsWith('text/plain')) {
+      try {
+        const response = await fetch(src, { cache: 'no-store' });
+        if (!response.ok) throw new Error((await response.text()) || '预览失败');
+        const pre = document.createElement('pre');
+        pre.textContent = await response.text();
+        content.append(pre);
+      } catch (error) { notify(error.message || '预览失败', true); }
+      return;
+    }
+    const media = document.createElement(type.startsWith('image/') ? 'img' : type.startsWith('audio/') ? 'audio' : 'video');
+    media.src = src;
+    if (media instanceof HTMLImageElement) media.alt = item.name;
+    else media.controls = true;
+    content.append(media);
+  }
+
+  async function apiAction(path, method, body) {
+    const response = await fetch(path, {
+      method,
+      ...(body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || '操作失败');
+    return data;
+  }
+
+  async function runBulk(action) {
+    const ids = [...selected];
+    if (!ids.length) return;
+    if (action === 'trash' && !confirm('将选中的 ' + ids.length + ' 个项目移至回收站？')) return;
+    if (action === 'purge' && !confirm('永久删除选中的 ' + ids.length + ' 个项目？此操作无法恢复。')) return;
+    if (action === 'revoke' && !confirm('撤销选中的 ' + ids.length + ' 个分享链接？')) return;
+    try {
+      for (const id of ids) {
+        if (action === 'trash') await davRequest(id.split('/'), 'DELETE');
+        else if (action === 'restore') await apiAction('/api/trash/' + encodeURIComponent(id) + '/restore', 'POST');
+        else if (action === 'purge') await apiAction('/api/trash/' + encodeURIComponent(id), 'DELETE');
+        else if (action === 'revoke') await apiAction('/api/shares/' + encodeURIComponent(id), 'DELETE');
+      }
+      selected.clear();
+      showViewLoading('正在加载');
+      notify(action === 'trash' ? '已移至回收站' : action === 'restore' ? '已恢复' : action === 'purge' ? '已永久删除' : '分享链接已撤销');
+      if (currentView === 'files') await loadFiles();
+      else if (currentView === 'trash') await loadTrash();
+      else if (currentView === 'shares') await loadShares();
+    } catch (error) {
+      notify(error.message || '批量操作失败，已完成部分项目', true);
+      if (currentView === 'files') await loadFiles();
+      else if (currentView === 'trash') await loadTrash();
+      else if (currentView === 'shares') await loadShares();
+    }
+  }
+
   async function loadFiles() {
     const status = el('status');
+    const requestView = ++viewRequest;
     status.className = 'status loading';
     status.lastChild.textContent = '正在连接';
     try {
@@ -425,15 +797,25 @@ const script = `
       if (response.status === 401) { showLogin(); status.className = 'status error'; status.lastChild.textContent = '未登录'; return; }
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || '加载失败');
+      if (requestView !== viewRequest) return;
       currentPath = data.path || [];
       el('dav-user').textContent = data.username || 'webdav';
       renderQuota(data.usage);
-      renderEntries(data.entries);
-      renderBreadcrumbs(data.path || []);
+      if (currentView === 'files') {
+        renderBreadcrumbs(data.path || []);
+        if (el('search').value.trim()) {
+          await loadRecursiveSearch();
+        } else {
+          searchCursor = null;
+          el('load-more').hidden = true;
+          renderEntries(data.entries);
+        }
+      }
       status.className = 'status';
       status.lastChild.textContent = '存储服务正常';
       loadTrend();
     } catch (error) {
+      if (requestView !== viewRequest) return;
       notify(error.message || '加载失败', true);
       status.className = 'status error';
       status.lastChild.textContent = '连接失败';
@@ -443,11 +825,20 @@ const script = `
   function initialize() {
     const value = decodeURIComponent(location.hash.slice(1));
     currentPath = value ? value.split('/') : [];
+    selected.clear();
     initConnHint();
     loadFiles();
   }
 
-  el('refresh').addEventListener('click', loadFiles);
+  el('refresh').addEventListener('click', async () => {
+    try {
+      if (currentView === 'files') await loadFiles();
+      else if (currentView === 'trash') await loadTrash();
+      else if (currentView === 'shares') await loadShares();
+      else if (currentView === 'inbox') await loadInboxes();
+      else if (currentView === 'galleries') await loadGalleries();
+    } catch (error) { notify(error.message || '刷新失败', true); }
+  });
   el('login-form').addEventListener('submit', async (event) => {
     event.preventDefault();
     const user = el('login-user').value.trim();
@@ -477,9 +868,28 @@ const script = `
     try { await fetch('/logout', { method: 'POST' }); } catch { /* 退出失败也回到登录页 */ }
     showLogin();
   });
-  el('search').addEventListener('input', () => renderEntries(currentEntries));
+  el('search').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadRecursiveSearch().catch((error) => {
+      if (error.name !== 'AbortError') notify(error.message || '搜索失败', true);
+    }), 220);
+  });
   el('mkdir').addEventListener('click', () => {
     mkdir().then(loadFiles).catch((error) => notify(error.message || '创建失败', true));
+  });
+  el('sort').addEventListener('change', () => { currentSort = el('sort').value; renderEntries(currentEntries); });
+  document.querySelectorAll('[data-view]').forEach((button) => button.addEventListener('click', () => switchView(button.dataset.view)));
+  el('load-more').addEventListener('click', () => loadRecursiveSearch(true).catch((error) => notify(error.message || '加载失败', true)));
+  el('empty-trash').addEventListener('click', async () => {
+    if (!confirm('永久删除回收站中的所有项目？此操作无法恢复。')) return;
+    try {
+      await apiAction('/api/trash', 'DELETE');
+      selected.clear();
+      await loadTrash();
+      const usageResponse = await fetch(apiPath(currentPath), { cache: 'no-store' });
+      if (usageResponse.ok) renderQuota((await usageResponse.json()).usage);
+      notify('回收站已清空');
+    } catch (error) { notify(error.message || '清空失败', true); }
   });
   el('sync').addEventListener('click', async () => {
     el('sync').disabled = true;
@@ -506,10 +916,67 @@ const script = `
     const del = event.target.closest('[data-delete]');
     const ren = event.target.closest('[data-rename]');
     const shareButton = event.target.closest('[data-share]');
+    const preview = event.target.closest('[data-preview]');
+    const restore = event.target.closest('[data-restore]');
+    const purge = event.target.closest('[data-purge]');
+    const revoke = event.target.closest('[data-revoke]');
+    const copyShare = event.target.closest('[data-copy-share]');
+    const inboxKeep = event.target.closest('[data-inbox-keep]');
+    const inboxDelete = event.target.closest('[data-inbox-delete]');
+    const copyInbox = event.target.closest('[data-copy-inbox]');
+    const revokeInbox = event.target.closest('[data-revoke-inbox]');
+    const revokeGallery = event.target.closest('[data-revoke-gallery]');
+    const copyGallery = event.target.closest('[data-copy-gallery]');
     if (dir) { event.preventDefault(); location.hash = encodeURIComponent(dir.dataset.dir || ''); }
     else if (del) { event.preventDefault(); try { if (await remove(del.dataset.delete)) loadFiles(); } catch (error) { notify(error.message || '删除失败', true); } }
     else if (ren) { event.preventDefault(); try { await rename(ren.dataset.rename); loadFiles(); } catch (error) { notify(error.message || '重命名失败', true); } }
     else if (shareButton) { event.preventDefault(); share(shareButton.dataset.share).catch((error) => notify(error.message || '分享失败', true)); }
+    else if (preview) { event.preventDefault(); const item = currentEntries.find((entry) => entry.key === preview.dataset.preview); if (item) openPreview(item); }
+    else if (restore) { try { await apiAction('/api/trash/' + encodeURIComponent(restore.dataset.restore) + '/restore', 'POST'); await loadTrash(); const response = await fetch(apiPath(currentPath), { cache: 'no-store' }); if (response.ok) renderQuota((await response.json()).usage); notify('已恢复'); } catch (error) { notify(error.message || '恢复失败', true); } }
+    else if (purge) { if (confirm('永久删除此项目？此操作无法恢复。')) try { await apiAction('/api/trash/' + encodeURIComponent(purge.dataset.purge), 'DELETE'); await loadTrash(); const response = await fetch(apiPath(currentPath), { cache: 'no-store' }); if (response.ok) renderQuota((await response.json()).usage); notify('已永久删除'); } catch (error) { notify(error.message || '删除失败', true); } }
+    else if (revoke) { if (confirm('撤销此分享链接？')) try { await apiAction('/api/shares/' + encodeURIComponent(revoke.dataset.revoke), 'DELETE'); await loadShares(); notify('分享链接已撤销'); } catch (error) { notify(error.message || '撤销失败', true); } }
+    else if (copyShare) { const item = currentShares.find((shareItem) => shareItem.id === copyShare.dataset.copyShare); if (item) { await navigator.clipboard.writeText(item.url); notify('链接已复制'); } }
+    else if (inboxKeep) { try { const result = await apiAction('/api/inboxes/' + encodeURIComponent(inboxKeep.dataset.inboxOwner) + '/items/' + encodeURIComponent(inboxKeep.dataset.inboxKeep) + '/keep', 'POST'); await loadInboxes(); notify('已保留到云盘：' + result.name); } catch (error) { notify(error.message || '保留失败', true); } }
+    else if (inboxDelete) { if (confirm('永久删除此待确认文件？')) try { await apiAction('/api/inboxes/' + encodeURIComponent(inboxDelete.dataset.inboxOwner) + '/items/' + encodeURIComponent(inboxDelete.dataset.inboxDelete) + '/delete', 'DELETE'); await loadInboxes(); notify('待确认文件已删除'); } catch (error) { notify(error.message || '删除失败', true); } }
+    else if (copyInbox) { await navigator.clipboard.writeText(copyInbox.dataset.inboxUrl); notify('收件链接已复制'); }
+    else if (revokeInbox) { if (confirm('撤销此收件链接？待确认文件仍会保留。')) try { await apiAction('/api/inboxes/' + encodeURIComponent(revokeInbox.dataset.revokeInbox), 'DELETE'); await loadInboxes(); notify('收件链接已撤销'); } catch (error) { notify(error.message || '撤销失败', true); } }
+    else if (revokeGallery) { if (confirm('撤销此公开主页？')) try { await apiAction('/api/galleries/' + encodeURIComponent(revokeGallery.dataset.revokeGallery), 'DELETE'); await loadGalleries(); notify('公开主页已撤销'); } catch (error) { notify(error.message || '撤销失败', true); } }
+    else if (copyGallery) { await navigator.clipboard.writeText(location.origin + '/gallery/' + copyGallery.dataset.copyGallery); notify('公开主页链接已复制'); }
+  });
+  el('table').addEventListener('change', (event) => {
+    const checkbox = event.target.closest('[data-select]');
+    if (checkbox) {
+      if (checkbox.checked) selected.add(checkbox.dataset.select);
+      else selected.delete(checkbox.dataset.select);
+      renderBulkState();
+    }
+    if (event.target.id === 'select-page') {
+      const entries = currentView === 'files' ? currentEntries : currentView === 'trash' ? currentTrash : currentShares;
+      for (const item of entries) {
+        const key = currentView === 'files' ? item.key : item.id;
+        if (event.target.checked) selected.add(key);
+        else selected.delete(key);
+      }
+      if (currentView === 'files') renderEntries(currentEntries);
+      if (currentView === 'trash') renderTrash(currentTrash);
+      if (currentView === 'shares') renderShares(currentShares);
+    }
+  });
+  el('bulk-actions').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-bulk]');
+    if (!button) return;
+    if (button.dataset.bulk === 'select-all') {
+      const entries = currentView === 'files' ? currentEntries : currentView === 'trash' ? currentTrash : currentShares;
+      for (const item of entries) selected.add(currentView === 'files' ? item.key : item.id);
+      if (currentView === 'files') renderEntries(currentEntries);
+      if (currentView === 'trash') renderTrash(currentTrash);
+      if (currentView === 'shares') renderShares(currentShares);
+    } else if (button.dataset.bulk === 'clear') {
+      selected.clear();
+      if (currentView === 'files') renderEntries(currentEntries);
+      if (currentView === 'trash') renderTrash(currentTrash);
+      if (currentView === 'shares') renderShares(currentShares);
+    } else runBulk(button.dataset.bulk);
   });
   el('share-ttl').addEventListener('change', () => { el('share-result').className = 'share-result'; });
   el('share-create').addEventListener('click', async () => {
@@ -534,6 +1001,37 @@ const script = `
     await navigator.clipboard.writeText(el('share-url').value);
     notify('已复制');
   });
+  el('preview-close').addEventListener('click', () => { el('preview-backdrop').classList.remove('show'); el('preview-content').replaceChildren(); });
+  el('preview-backdrop').addEventListener('click', (event) => {
+    if (event.target === el('preview-backdrop')) { el('preview-backdrop').classList.remove('show'); el('preview-content').replaceChildren(); }
+  });
+  el('inbox-create-open').addEventListener('click', openInboxDialog);
+  el('inbox-create').addEventListener('click', async () => {
+    el('inbox-create').disabled = true;
+    try { await createInboxLink(); } catch (error) { notify(error.message || '收件链接生成失败', true); }
+    finally { el('inbox-create').disabled = false; }
+  });
+  el('inbox-copy').addEventListener('click', async () => { await navigator.clipboard.writeText(el('inbox-url').value); notify('收件链接已复制'); });
+  el('inbox-close').addEventListener('click', () => el('inbox-backdrop').classList.remove('show'));
+  el('inbox-backdrop').addEventListener('click', (event) => { if (event.target === el('inbox-backdrop')) el('inbox-backdrop').classList.remove('show'); });
+  el('gallery-create-open').addEventListener('click', openGalleryDialog);
+  el('gallery-create').addEventListener('click', async () => {
+    el('gallery-create').disabled = true;
+    try { await createGallery(); } catch (error) { notify(error.message || '公开主页生成失败', true); }
+    finally { el('gallery-create').disabled = false; }
+  });
+  el('gallery-copy').addEventListener('click', async () => { await navigator.clipboard.writeText(el('gallery-url').value); notify('公开主页链接已复制'); });
+  el('gallery-close').addEventListener('click', () => el('gallery-backdrop').classList.remove('show'));
+  el('gallery-backdrop').addEventListener('click', (event) => { if (event.target === el('gallery-backdrop')) el('gallery-backdrop').classList.remove('show'); });
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      el('share-backdrop').classList.remove('show');
+      el('preview-backdrop').classList.remove('show');
+      el('preview-content').replaceChildren();
+      el('inbox-backdrop').classList.remove('show');
+      el('gallery-backdrop').classList.remove('show');
+    }
+  });
   const tablewrap = document.querySelector('.tablewrap');
   ['dragenter', 'dragover'].forEach((type) => tablewrap.addEventListener(type, (event) => {
     event.preventDefault();
@@ -545,6 +1043,7 @@ const script = `
     tablewrap.classList.remove('dragover');
   }));
   tablewrap.addEventListener('drop', async (event) => {
+    if (currentView !== 'files') return;
     const files = [...(event.dataTransfer ? event.dataTransfer.files : [])];
     if (!files.length) return;
     el('file').disabled = true;
@@ -553,6 +1052,7 @@ const script = `
     catch (error) { notify(error.message || '上传失败', true); }
     finally { el('file').disabled = false; setUploadProgress(false); }
   });
+  ${fileMapScript}
   window.addEventListener('hashchange', initialize);
   initialize();
 `;
@@ -583,14 +1083,27 @@ export function webPage(nonce: string): string {
   </section>
   <section class="panel" aria-labelledby="files-title">
     <div class="panel-heading"><div class="panel-title"><h2 id="files-title">文件管理</h2><span id="entry-count">正在加载</span></div><div id="status" class="status loading" role="status" aria-live="polite"><span class="status-dot"></span><span>正在连接</span></div></div>
+    <nav class="view-tabs" aria-label="文件视图">
+      <button class="active" data-view="files">文件</button>
+      <button data-view="inbox">收件箱</button>
+      <button data-view="trash">回收站</button>
+      <button data-view="shares">分享链接</button>
+      <button data-view="galleries">公开主页</button>
+    </nav>
     <div class="toolbar">
       <nav id="breadcrumbs" class="breadcrumbs" aria-label="目录路径"></nav>
-      <div class="toolbar-tools"><label class="search"><svg viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.5 4.5"/></svg><input id="search" type="search" placeholder="搜索当前目录" aria-label="搜索当前目录"></label><button id="mkdir" aria-label="新建文件夹"><svg viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><path d="M12 10.5v6M9 13.5h6"/></svg>新建文件夹</button><div class="upload"><input id="file" type="file" multiple><label class="upload-label" for="file"><svg viewBox="0 0 24 24"><path d="M12 16V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 14v5h14v-5"/></svg><span id="upload-label-text">上传文件</span></label></div></div>
+      <div class="toolbar-tools" id="search-tools"><label class="search"><svg viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.3"/><path d="m16 16 4.5 4.5"/></svg><input id="search" type="search" placeholder="递归搜索当前目录" aria-label="递归搜索当前目录"></label>
+        <select id="sort" aria-label="排序"><option value="name">按名称</option><option value="updated">最近修改</option><option value="created">最近创建</option><option value="size">文件大小</option><option value="type">文件类型</option></select></div>
+      <div class="toolbar-tools" id="file-tools"><button id="mkdir" aria-label="新建文件夹"><svg viewBox="0 0 24 24"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H10l2 2h6.5A2.5 2.5 0 0 1 21 9.5v8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/><path d="M12 10.5v6M9 13.5h6"/></svg>新建文件夹</button><div class="upload"><input id="file" type="file" multiple><label class="upload-label" for="file"><svg viewBox="0 0 24 24"><path d="M12 16V4M7.5 8.5 12 4.5"/><path d="M5 14v5h14v-5"/></svg><span id="upload-label-text">上传文件</span></label></div><button id="star-map-open" aria-label="打开文件星图">文件星图</button><button id="inbox-create-open">生成收件链接</button><button id="gallery-create-open">发布目录主页</button></div>
+      <button id="empty-trash" class="danger" hidden>清空回收站</button>
     </div>
+    <div id="bulk-actions" class="bulk-actions"></div>
     <div id="upload-progress" class="upload-progress"><span>正在上传</span><div class="bar"><div id="upload-bar" class="fill" style="width:0"></div></div></div>
     <div class="tablewrap">
-      <table class="table"><thead><tr><th>名称</th><th>大小</th><th>创建时间</th><th>修改时间</th><th>操作</th></tr></thead><tbody id="rows"><tr><td colspan="5" class="empty-cell">正在加载文件列表…</td></tr></tbody></table>
+      <table id="table" class="table"><thead id="table-head"><tr><th></th><th>名称</th><th>大小</th><th>创建时间</th><th>修改时间</th><th>操作</th></tr></thead><tbody id="rows"><tr><td colspan="6" class="empty-cell">正在加载文件列表…</td></tr></tbody></table>
     </div>
+    <button id="load-more" class="load-more" hidden>加载更多搜索结果</button>
+    <section id="inbox-links" class="inbox-links" hidden><h3>收件链接</h3><div id="inbox-links-list"></div></section>
   </section>
   <p class="footer-note">用量数据为 Worker 侧统计估算；点击“同步官方用量”可与 Cloudflare 官方数据校准。</p>
 </main>
@@ -616,6 +1129,8 @@ export function webPage(nonce: string): string {
       <label><input type="radio" name="share-ttl" value="168"><span>7 天</span></label>
       <label><input type="radio" name="share-ttl" value="720"><span>30 天</span></label>
     </div>
+    <label class="limit-field">访问次数上限 <input id="share-limit" type="number" min="1" max="10000" placeholder="不限"></label>
+    <p class="limit-note">播放或下载产生的每个请求都会计数，Range 分段请求也包含在内。</p>
     <div id="share-result" class="share-result">
       <textarea id="share-url" readonly aria-label="分享链接"></textarea>
     </div>
@@ -624,6 +1139,30 @@ export function webPage(nonce: string): string {
       <button id="share-cancel">关闭</button>
       <button id="share-create" class="primary">生成链接</button>
     </div>
+  </div>
+</div>
+<div id="preview-backdrop" class="dialog-backdrop">
+  <div class="dialog preview-dialog" role="dialog" aria-modal="true" aria-labelledby="preview-title">
+    <div class="preview-heading"><h3 id="preview-title">文件预览</h3><button id="preview-close" aria-label="关闭预览">关闭</button></div>
+    <div id="preview-content"></div>
+  </div>
+</div>
+${fileMapMarkup}
+<div id="inbox-backdrop" class="dialog-backdrop">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="inbox-title">
+    <h3 id="inbox-title">生成收件链接</h3><p id="inbox-context" class="dialog-sub">文件将进入待确认区，不会覆盖已有文件。</p>
+    <label class="limit-field">有效期<select id="inbox-ttl"><option value="24">1 天</option><option value="168" selected>7 天</option><option value="720">30 天</option></select></label>
+    <div id="inbox-result" class="share-result"><textarea id="inbox-url" readonly aria-label="收件链接"></textarea></div>
+    <div class="dialog-actions"><button id="inbox-copy">复制</button><button id="inbox-close">关闭</button><button id="inbox-create" class="primary">生成链接</button></div>
+  </div>
+</div>
+<div id="gallery-backdrop" class="dialog-backdrop">
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="gallery-title">
+    <h3 id="gallery-title">发布目录主页</h3><p id="gallery-context" class="dialog-sub">公开内容会固定为当前文件快照；HTML、脚本和 SVG 不会公开。</p>
+    <label class="text-field">页面标题<input id="gallery-title-input" type="text" maxlength="120"></label>
+    <div id="gallery-mode" class="mode-options"><label><input type="radio" name="gallery-mode" value="photos" checked>照片墙</label><label><input type="radio" name="gallery-mode" value="files">文件展示</label></div>
+    <div id="gallery-result" class="share-result"><textarea id="gallery-url" readonly aria-label="公开主页链接"></textarea></div>
+    <div class="dialog-actions"><button id="gallery-copy">复制</button><button id="gallery-close">关闭</button><button id="gallery-create" class="primary">生成主页</button></div>
   </div>
 </div>
 <script nonce="${nonce}">${script}</script>
